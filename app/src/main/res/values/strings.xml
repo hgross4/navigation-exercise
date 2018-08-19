@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">Navigation Exercise</string>
     <string name="title_activity_main">Navigation Exercise</string>
+    <string name="no_maps">Google Maps V2 not available</string>
+    <string name="menu_follow">Auto-Follow</string>
+    <string name="start">START</string>
 </resources>
