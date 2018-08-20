@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.support.design.widget.FloatingActionButton
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
+import android.widget.TextView
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.*
@@ -44,6 +45,7 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
     private var navigationStopTime = 0L
     private var navigationDistance = 0f
     private var previousLocation: Location? = null
+    private var buttonText: TextView? = null
 
     // maximum distance in meters from destination in order to declare arrival
     private val ARRIVAL_THRESHOLD = 10
@@ -79,14 +81,31 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
         locMgr = getSystemService(LOCATION_SERVICE) as LocationManager
         crit.accuracy = Criteria.ACCURACY_FINE
 
+        buttonText = findViewById(R.id.navigation_button)
+
         val fab = findViewById<FloatingActionButton>(R.id.fab)
         fab.setOnClickListener { view ->
-            navigationUnderway = true
-            navigationStartTime = Calendar.getInstance().timeInMillis
-            navigationDistance = 0f
-            previousLocation = null
+            if (!navigationUnderway) {
+                initiateNavigation()
+            } else {
+                discontinueNavigation()
+            }
         }
         polyline.width(5f)?.color(Color.BLUE)?.visible(true)?.zIndex(30f)
+    }
+
+    fun initiateNavigation() {
+        navigationUnderway = true
+        navigationStartTime = Calendar.getInstance().timeInMillis
+        navigationDistance = 0f
+        previousLocation = null
+        buttonText?.setText(R.string.stop)
+    }
+
+    fun discontinueNavigation() {
+        navigationUnderway = false
+        buttonText?.setText(R.string.start)
+        polyline = PolylineOptions()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -221,15 +240,16 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
     }
 
     override fun onMapClick(point: LatLng?) {
-        map!!.clear()
-        map!!.addMarker(MarkerOptions().position(point!!))
-        destination.latitude = point.latitude
-        destination.longitude = point.longitude
+        if (!navigationUnderway) {
+            map!!.clear()
+            map!!.addMarker(MarkerOptions().position(point!!))
+            destination.latitude = point.latitude
+            destination.longitude = point.longitude
+        }
     }
 
     companion object {
         private val STATE_IN_PERMISSION = "inPermission"
-        private val STATE_AUTO_FOLLOW = "autoFollow"
         private val REQUEST_PERMS = 1337
     }
 }

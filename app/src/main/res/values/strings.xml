@@ -4,6 +4,7 @@
     <string name="no_maps">Google Maps V2 not available</string>
     <string name="menu_follow">Auto-Follow</string>
     <string name="start">START</string>
+    <string name="stop">STOP</string>
     <string name="elapsed_time">Elapsed time %1$s</string>
     <string name="distance_traveled">Distance traveled %1$s</string>
 
