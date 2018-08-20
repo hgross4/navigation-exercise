@@ -18,6 +18,7 @@ import com.google.android.gms.maps.*
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions
+import java.util.*
 
 
 /**
@@ -38,7 +39,14 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
     private val defaultLocation = LatLng(41.8781, -87.6298) // Chicago
     private val DEFAULT_ZOOM = 15f
     private var fusedLocationProviderClient: FusedLocationProviderClient? = null
-    private var navigationInitiated: Boolean = false
+    private var navigationUnderway: Boolean = false
+    private var navigationStartTime = 0L
+    private var navigationStopTime = 0L
+    private var navigationDistance = 0f
+    private var previousLocation: Location? = null
+
+    // maximum distance in meters from destination in order to declare arrival
+    private val ARRIVAL_THRESHOLD = 10
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -73,7 +81,10 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
 
         val fab = findViewById<FloatingActionButton>(R.id.fab)
         fab.setOnClickListener { view ->
-            navigationInitiated = true
+            navigationUnderway = true
+            navigationStartTime = Calendar.getInstance().timeInMillis
+            navigationDistance = 0f
+            previousLocation = null
         }
         polyline.width(5f)?.color(Color.BLUE)?.visible(true)?.zIndex(30f)
     }
@@ -149,9 +160,26 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
 
             val latlng = LatLng(location.latitude, location.longitude)
 
-            if (navigationInitiated) {
+            if (navigationUnderway) {
+
+                if (previousLocation != null) {
+                    navigationDistance += location.distanceTo(previousLocation)
+                }
+
                 polyline.add(latlng)
+
                 drawPath()
+
+                if (location.distanceTo(destination) < ARRIVAL_THRESHOLD) {
+                    navigationUnderway = false
+                    navigationStopTime = Calendar.getInstance().timeInMillis
+                    val elapsedTime = navigationStopTime - navigationStartTime
+                    val dialogFragment =
+                            NavigationDialogFragment.newInstance(elapsedTime.toString(), navigationDistance.toString())
+                    dialogFragment.show(getSupportFragmentManager(), "")
+                }
+
+                previousLocation = location
             }
 
             val cu = CameraUpdateFactory.newLatLng(latlng)
