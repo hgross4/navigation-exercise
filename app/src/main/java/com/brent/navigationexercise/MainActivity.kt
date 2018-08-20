@@ -12,15 +12,12 @@ import android.os.Bundle
 import android.support.design.widget.FloatingActionButton
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
-import android.util.Log
-import android.view.Menu
-import android.view.MenuItem
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.*
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions
-
-
 
 
 /**
@@ -36,8 +33,12 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
     private val crit = Criteria()
     private var needsInit = false
     private var map: GoogleMap? = null
-    private var autoFollow = true
     var polyline: PolylineOptions = PolylineOptions()
+    var destination: Location = Location("")
+    private val defaultLocation = LatLng(41.8781, -87.6298) // Chicago
+    private val DEFAULT_ZOOM = 15f
+    private var fusedLocationProviderClient: FusedLocationProviderClient? = null
+    private var navigationInitiated: Boolean = false
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -46,8 +47,10 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
             needsInit = true
         } else {
             isInPermission = state.getBoolean(STATE_IN_PERMISSION, false)
-            autoFollow = state.getBoolean(STATE_AUTO_FOLLOW, true)
         }
+
+        fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this)
+
         onCreateForRealz(canGetLocation())
     }
 
@@ -56,9 +59,8 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
         this.map = map
 
         if (needsInit) {
-            val center = CameraUpdateFactory.newLatLng(LatLng(40.76793169992044,
-                    -73.98180484771729))
-            val zoom = CameraUpdateFactory.zoomTo(15f)
+            val center = CameraUpdateFactory.newLatLng(defaultLocation)
+            val zoom = CameraUpdateFactory.zoomTo(DEFAULT_ZOOM)
 
             map.moveCamera(center)
             map.animateCamera(zoom)
@@ -71,7 +73,7 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
 
         val fab = findViewById<FloatingActionButton>(R.id.fab)
         fab.setOnClickListener { view ->
-            follow()
+            navigationInitiated = true
         }
         polyline.width(5f)?.color(Color.BLUE)?.visible(true)?.zIndex(30f)
     }
@@ -80,7 +82,6 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
         super.onSaveInstanceState(outState)
 
         outState.putBoolean(STATE_IN_PERMISSION, isInPermission)
-        outState.putBoolean(STATE_AUTO_FOLLOW, autoFollow)
     }
 
     override fun onRequestPermissionsResult(requestCode: Int,
@@ -123,8 +124,7 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
     override fun onStart() {
         super.onStart()
 
-        // todo remove the line below or modify it for correct behavior on app start up
-//        follow()
+        follow(true)
     }
 
     override fun onStop() {
@@ -149,8 +149,10 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
 
             val latlng = LatLng(location.latitude, location.longitude)
 
-            polyline.add(latlng)
-            drawPath()
+            if (navigationInitiated) {
+                polyline.add(latlng)
+                drawPath()
+            }
 
             val cu = CameraUpdateFactory.newLatLng(latlng)
 
@@ -176,7 +178,7 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
     }
 
     @SuppressLint("MissingPermission")
-    private fun follow() {
+    private fun follow(autoFollow: Boolean) {
         if (map != null && locMgr != null) {
             if (autoFollow) {
                 locMgr!!.requestLocationUpdates(0L, 0.0f, crit, this, null)
@@ -193,6 +195,8 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
     override fun onMapClick(point: LatLng?) {
         map!!.clear()
         map!!.addMarker(MarkerOptions().position(point!!))
+        destination.latitude = point.latitude
+        destination.longitude = point.longitude
     }
 
     companion object {
