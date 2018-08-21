@@ -25,8 +25,6 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLngBounds
 
 
-
-
 /**
  * Adapted from https://github.com/commonsguy/cw-omnibus/tree/master/MapsV2/Location
  */
