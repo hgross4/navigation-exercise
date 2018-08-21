@@ -1,12 +1,12 @@
 # Navigation Exercise
 
-To navigate using the app:  
+### To navigate using the app:  
 • Touch the map to indicate your desired destination.  
 • Touch Start to begin navigation.  
 • Touch Stop to terminate navigation (if you decide to change your destination or no longer want to navigate for any reason).  
 • When within 10 meters of your destination, navigation automatically ends and a summary is displayed.  
 
-To do's, done and not done:  
+### To do's, done and not done:  
 • Don't allow touches to change destination after Start pressed. DONE  
 • If Start pressed without a destination set, show message to user. NOT DONE  
 • End by detecting when current location is within X units of destination, and show summary at that point. DONE  
