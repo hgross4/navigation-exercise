@@ -1,4 +1,4 @@
-# navigation-exercise
+# Navigation Exercise
 
 To navigate using the app:  
 • Touch the map to indicate your desired destination.  
