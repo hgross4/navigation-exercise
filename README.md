@@ -1,6 +1,7 @@
 # Navigation Exercise
 
-### To navigate using the app:  
+### To navigate from your current location:  
+• If your current location isn't automatically found upon startup, press the compass button in the upper right corner to center the map on your location.  
 • Touch the map to indicate your desired destination.  
 • Touch Start to begin navigation.  
 • Touch Stop to terminate navigation (if you decide to change your destination or no longer want to navigate for any reason).  
