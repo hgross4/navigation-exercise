@@ -1,6 +1,10 @@
 package com.brent.navigationexercise
 
 
+import android.app.Activity
+import android.app.AlertDialog
+import android.app.Dialog
+import android.content.Context
 import android.os.Bundle
 import android.support.v4.app.DialogFragment
 import android.support.v4.app.Fragment
@@ -8,6 +12,10 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.content.DialogInterface
+import java.util.concurrent.TimeUnit
+import android.view.WindowManager
+import android.view.Gravity
 
 
 // TODO: Rename parameter arguments, choose names that match
@@ -25,6 +33,7 @@ class NavigationDialogFragment : DialogFragment() {
     // TODO: Rename and change types of parameters
     private var elapsedTime: String? = null
     private var distanceTraveled: String? = null
+    private var dialogListener: NavigationDialogFragment.DialogListener? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,6 +55,46 @@ class NavigationDialogFragment : DialogFragment() {
         distanceTraveledView.setText(String.format(getString(R.string.distance_traveled, ": " + distanceTraveled)))
 
         return rootView
+    }
+
+    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+
+        val alertDialogBuilder: AlertDialog.Builder  = AlertDialog.Builder(getActivity())
+        val message = StringBuilder()
+        val formattedElapsedTime = String.format("%d min, %d sec",
+                TimeUnit.MILLISECONDS.toMinutes(elapsedTime!!.toLong()),
+                TimeUnit.MILLISECONDS.toSeconds(elapsedTime!!.toLong()) -
+                        TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(elapsedTime!!.toLong()))
+        )
+        message.append(String.format(getString(R.string.elapsed_time, ": $formattedElapsedTime")))
+                .append("\n")
+                .append(String.format(getString(R.string.distance_traveled, ": $distanceTraveled")))
+        alertDialogBuilder.setMessage(message)
+        alertDialogBuilder.setPositiveButton("CLOSE"){dialog, which ->
+            dialogListener?.onDialogDismissed()
+        }
+
+        val alertDialog = alertDialogBuilder.create()
+        val window = alertDialog.getWindow()
+        val wlp = window.attributes
+
+        wlp.gravity = Gravity.BOTTOM
+        wlp.flags = wlp.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND.inv()
+        window.attributes = wlp
+
+        return alertDialog
+    }
+
+    interface DialogListener {
+        fun onDialogDismissed()
+    }
+
+    override fun onAttach(context: Context?) {
+        super.onAttach(context)
+
+        if (context is Activity && context is NavigationDialogFragment.DialogListener) {
+            dialogListener = context
+        }
     }
 
 

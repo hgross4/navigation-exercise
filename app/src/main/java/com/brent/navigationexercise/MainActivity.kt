@@ -13,6 +13,7 @@ import android.support.design.widget.FloatingActionButton
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import android.widget.TextView
+import android.widget.Toast
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.*
@@ -20,13 +21,18 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions
 import java.util.*
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.LatLngBounds
+
+
 
 
 /**
  * Adapted from https://github.com/commonsguy/cw-omnibus/tree/master/MapsV2/Location
  */
 
-class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapClickListener, LocationSource, LocationListener {
+class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapClickListener,
+        LocationSource, LocationListener, NavigationDialogFragment.DialogListener {
 
     private val TAG = MainActivity::class.java.getSimpleName()
     private var isInPermission = false
@@ -35,8 +41,8 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
     private val crit = Criteria()
     private var needsInit = false
     private var map: GoogleMap? = null
-    var polyline: PolylineOptions = PolylineOptions()
-    var destination: Location = Location("")
+    private var polyline: PolylineOptions = PolylineOptions()
+    private var destination: Location = Location("")
     private val defaultLocation = LatLng(41.8781, -87.6298) // Chicago
     private val DEFAULT_ZOOM = 15f
     private var fusedLocationProviderClient: FusedLocationProviderClient? = null
@@ -69,11 +75,7 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
         this.map = map
 
         if (needsInit) {
-            val center = CameraUpdateFactory.newLatLng(defaultLocation)
-            val zoom = CameraUpdateFactory.zoomTo(DEFAULT_ZOOM)
-
-            map.moveCamera(center)
-            map.animateCamera(zoom)
+            moveAndZoom(defaultLocation, DEFAULT_ZOOM)
         }
 
         map.setOnMapClickListener(this)
@@ -86,26 +88,69 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
         val fab = findViewById<FloatingActionButton>(R.id.fab)
         fab.setOnClickListener { view ->
             if (!navigationUnderway) {
-                initiateNavigation()
+                startNavigation()
             } else {
                 discontinueNavigation()
             }
         }
+
         polyline.width(5f)?.color(Color.BLUE)?.visible(true)?.zIndex(30f)
+
+        getInitialLocation()
     }
 
-    fun initiateNavigation() {
+    private fun moveAndZoom(latLng: LatLng, zoom: Float) {
+        val center = CameraUpdateFactory.newLatLng(latLng)
+        val zoom = CameraUpdateFactory.zoomTo(zoom)
+
+        map?.moveCamera(center)
+        map?.animateCamera(zoom)
+    }
+
+    private fun getInitialLocation() {
+
+        var location: Location? = null
+
+        if (canGetLocation()) {
+            val criteria = Criteria()
+            val provider = locMgr?.getBestProvider(criteria, true)
+            try {
+                location = locMgr?.getLastKnownLocation(provider)
+            } catch (e: SecurityException) {
+                Toast.makeText(this, "Permission not granted", Toast.LENGTH_LONG).show()
+            }
+        } else {
+            return
+        }
+
+        if (location != null) {
+            // Getting latitude of the current location
+            val latitude = location.getLatitude()
+
+            // Getting longitude of the current location
+            val longitude = location.getLongitude()
+
+            val currentPosition = LatLng(latitude, longitude)
+
+            moveAndZoom(currentPosition, DEFAULT_ZOOM)
+        }
+    }
+
+    private fun startNavigation() {
         navigationUnderway = true
         navigationStartTime = Calendar.getInstance().timeInMillis
         navigationDistance = 0f
         previousLocation = null
         buttonText?.setText(R.string.stop)
+        follow(true)
     }
 
-    fun discontinueNavigation() {
+    private fun discontinueNavigation() {
         navigationUnderway = false
         buttonText?.setText(R.string.start)
         polyline = PolylineOptions()
+        follow(false)
+        map?.clear()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -141,7 +186,8 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
             isInPermission = true
 
             ActivityCompat.requestPermissions(this,
-                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION),
                     REQUEST_PERMS)
         }
     }
@@ -149,6 +195,8 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
     private fun canGetLocation(): Boolean {
         return ContextCompat.checkSelfPermission(this,
                 Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                && ContextCompat.checkSelfPermission(this,
+                Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
     }
 
     override fun onStart() {
@@ -179,37 +227,70 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
 
             val latlng = LatLng(location.latitude, location.longitude)
 
-            if (navigationUnderway) {
-
-                if (previousLocation != null) {
-                    navigationDistance += location.distanceTo(previousLocation)
-                }
-
-                polyline.add(latlng)
-
-                drawPath()
-
-                if (location.distanceTo(destination) < ARRIVAL_THRESHOLD) {
-                    navigationUnderway = false
-                    navigationStopTime = Calendar.getInstance().timeInMillis
-                    val elapsedTime = navigationStopTime - navigationStartTime
-                    val dialogFragment =
-                            NavigationDialogFragment.newInstance(elapsedTime.toString(), navigationDistance.toString())
-                    dialogFragment.show(getSupportFragmentManager(), "")
-                }
-
-                previousLocation = location
+            if (previousLocation != null) {
+                navigationDistance += location.distanceTo(previousLocation)
             }
+
+            polyline.add(latlng)
+
+            drawPath()
+
+            if (location.distanceTo(destination) < ARRIVAL_THRESHOLD) {
+                navigationUnderway = false
+                navigationStopTime = Calendar.getInstance().timeInMillis
+                val elapsedTime = navigationStopTime - navigationStartTime
+                val dialogFragment =
+                        NavigationDialogFragment.newInstance(elapsedTime.toString(),
+                                navigationDistance.toString())
+                dialogFragment.show(getSupportFragmentManager(), "")
+                follow(false)
+                showWholePath()
+            }
+
+            previousLocation = location
 
             val cu = CameraUpdateFactory.newLatLng(latlng)
 
-            map!!.animateCamera(cu)
+            map?.addMarker(MarkerOptions().position(LatLng(destination.latitude, destination.longitude)))
+
+            map?.animateCamera(cu)
         }
     }
 
     fun drawPath() {
         map?.clear()
         map?.addPolyline(polyline);
+    }
+
+    private fun showWholePath() {
+        var hasPoints = false
+        var maxLat: Double? = null
+        var minLat: Double? = null
+        var minLon: Double? = null
+        var maxLon: Double? = null
+
+        if (polyline.points != null) {
+            val pts = polyline.points
+            for (coordinate in pts) {
+                // Find out the maximum and minimum latitudes & longitudes
+                // Latitude
+                maxLat = if (maxLat != null) Math.max(coordinate.latitude, maxLat) else coordinate.latitude
+                minLat = if (minLat != null) Math.min(coordinate.latitude, minLat) else coordinate.latitude
+
+                // Longitude
+                maxLon = if (maxLon != null) Math.max(coordinate.longitude, maxLon) else coordinate.longitude
+                minLon = if (minLon != null) Math.min(coordinate.longitude, minLon) else coordinate.longitude
+
+                hasPoints = true
+            }
+        }
+
+        if (hasPoints) {
+            val builder = LatLngBounds.Builder()
+            builder.include(LatLng(maxLat!!, maxLon!!))
+            builder.include(LatLng(minLat!!, minLon!!))
+            map?.moveCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 48))
+        }
     }
 
     override fun onProviderDisabled(provider: String) {
@@ -246,6 +327,10 @@ class MainActivity : AbstractMapActivity(), OnMapReadyCallback, GoogleMap.OnMapC
             destination.latitude = point.latitude
             destination.longitude = point.longitude
         }
+    }
+
+    override fun onDialogDismissed() {
+        discontinueNavigation()
     }
 
     companion object {
